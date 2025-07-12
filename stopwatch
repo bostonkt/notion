@@ -1,0 +1,246 @@
+// Enhanced Stopwatch with Resume Functionality
+class Stopwatch {
+  constructor(display, results) {
+    this.running = false;
+    this.display = display;
+    this.results = results;
+    this.sessions = [];
+    this.currentSession = null;
+    this.totalTime = 0;
+    this.reset();
+    this.print(this.times);
+  }
+  
+  reset() {
+    this.times = [0, 0, 0];
+    this.totalTime = 0;
+    this.startTime = null;
+    this.print();
+  }
+  
+  start() {
+    if (!this.running) {
+      this.running = true;
+      this.startTime = new Date().getTime() - this.totalTime;
+      
+      // Create a new session if needed
+      if (!this.currentSession) {
+        this.currentSession = {
+          name: document.getElementById('projectInput').value || 'Unnamed Project',
+          intervals: [],
+          startTime: new Date(),
+          totalTime: 0
+        };
+      }
+      
+      // Add a new interval
+      this.currentSession.intervals.push({
+        start: new Date()
+      });
+      
+      this.step();
+      document.getElementById('startBtn').disabled = true;
+      document.getElementById('stopBtn').disabled = false;
+    }
+  }
+  
+  stop() {
+    if (this.running) {
+      this.running = false;
+      this.totalTime = new Date().getTime() - this.startTime;
+      
+      // Update the current interval
+      const currentInterval = this.currentSession.intervals[this.currentSession.intervals.length - 1];
+      currentInterval.end = new Date();
+      currentInterval.duration = (currentInterval.end - currentInterval.start) / 1000; // in seconds
+      
+      // Update session total time
+      this.currentSession.totalTime += currentInterval.duration;
+      
+      this.updateResults();
+      document.getElementById('startBtn').disabled = false;
+      document.getElementById('stopBtn').disabled = true;
+      document.getElementById('startBtn').innerText = 'Resume';
+    }
+  }
+  
+  completeSession() {
+    if (this.running) {
+      this.stop();
+    }
+    
+    if (this.currentSession) {
+      this.currentSession.endTime = new Date();
+      this.sessions.push(this.currentSession);
+      this.currentSession = null;
+      this.reset();
+      this.updateResults();
+      document.getElementById('startBtn').innerText = 'Start New Session';
+    }
+  }
+  
+  step() {
+    if (!this.running) return;
+    
+    const currentTime = new Date().getTime();
+    const timeElapsed = currentTime - this.startTime;
+    
+    this.times[0] = Math.floor(timeElapsed / 3600000);
+    this.times[1] = Math.floor(timeElapsed / 60000) % 60;
+    this.times[2] = Math.floor(timeElapsed / 1000) % 60;
+    
+    this.print();
+    requestAnimationFrame(this.step.bind(this));
+  }
+  
+  print() {
+    this.display.innerText = this.format(this.times);
+  }
+  
+  format(times) {
+    return `${pad0(times[0], 2)}:${pad0(times[1], 2)}:${pad0(times[2], 2)}`;
+  }
+  
+  formatDuration(seconds) {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${pad0(hours, 2)}:${pad0(minutes, 2)}:${pad0(secs, 2)}`;
+  }
+  
+  updateResults() {
+    let html = '';
+    
+    // Add current session if it exists
+    if (this.currentSession && this.currentSession.intervals.length > 0) {
+      html += `<div class="session current">
+        <h3>${this.currentSession.name} (Current Session)</h3>
+        <div>Started: ${this.currentSession.startTime.toLocaleTimeString()}</div>
+        <div>Total time: ${this.formatDuration(this.currentSession.totalTime)}</div>
+        <div class="intervals">
+          <h4>Work Intervals:</h4>
+          <ul>`;
+      
+      this.currentSession.intervals.forEach((interval, i) => {
+        html += `<li>Interval ${i + 1}: `;
+        if (interval.end) {
+          html += `${interval.start.toLocaleTimeString()} - ${interval.end.toLocaleTimeString()} (${this.formatDuration(interval.duration)})`;
+        } else {
+          html += `${interval.start.toLocaleTimeString()} - (in progress)`;
+        }
+        html += `</li>`;
+      });
+      
+      html += `</ul></div></div>`;
+    }
+    
+    // Add completed sessions
+    if (this.sessions.length > 0) {
+      html += `<h3>Completed Sessions:</h3>`;
+      
+      this.sessions.forEach((session, i) => {
+        html += `<div class="session">
+          <h4>${session.name}</h4>
+          <div>Time: ${session.startTime.toLocaleTimeString()} - ${session.endTime.toLocaleTimeString()}</div>
+          <div>Total time: ${this.formatDuration(session.totalTime)}</div>
+          <div class="intervals">
+            <div>Number of work intervals: ${session.intervals.length}</div>
+          </div>
+        </div>`;
+      });
+    }
+    
+    this.results.innerHTML = html;
+  }
+}
+
+function pad0(value, count) {
+  let result = value.toString();
+  for (; result.length < count; --count) {
+    result = '0' + result;
+  }
+  return result;
+}
+
+// Create elements when the page loads
+document.addEventListener('DOMContentLoaded', function() {
+  const container = document.createElement('div');
+  container.style.textAlign = 'center';
+  container.style.margin = '20px 0';
+  
+  const displayEl = document.createElement('div');
+  displayEl.style.fontSize = '48px';
+  displayEl.style.fontFamily = 'monospace';
+  displayEl.style.margin = '20px 0';
+  displayEl.innerText = '00:00:00';
+  
+  const btnContainer = document.createElement('div');
+  btnContainer.style.margin = '20px 0';
+  
+  const projectInput = document.createElement('input');
+  projectInput.id = 'projectInput';
+  projectInput.type = 'text';
+  projectInput.placeholder = 'Project name';
+  projectInput.style.padding = '8px';
+  projectInput.style.margin = '0 10px';
+  
+  const startBtn = createButton('Start New Session', 'startBtn');
+  const stopBtn = createButton('Pause', 'stopBtn');
+  const completeBtn = createButton('Complete Session', 'completeBtn');
+  
+  // Initial button states
+  stopBtn.disabled = true;
+  
+  btnContainer.appendChild(projectInput);
+  btnContainer.appendChild(startBtn);
+  btnContainer.appendChild(stopBtn);
+  btnContainer.appendChild(completeBtn);
+  
+  const resultsContainer = document.createElement('div');
+  resultsContainer.style.margin = '20px auto';
+  resultsContainer.style.maxWidth = '600px';
+  resultsContainer.style.textAlign = 'left';
+  
+  const resultsEl = document.createElement('div');
+  resultsEl.className = 'results';
+  resultsEl.style.border = '1px solid #eee';
+  resultsEl.style.padding = '15px';
+  resultsEl.style.borderRadius = '5px';
+  
+  resultsContainer.appendChild(resultsEl);
+  
+  container.appendChild(displayEl);
+  container.appendChild(btnContainer);
+  container.appendChild(resultsContainer);
+  
+  // Add the container to the page
+  document.body.appendChild(container);
+  
+  // Add some CSS
+  const style = document.createElement('style');
+  style.textContent = `
+    .session { margin-bottom: 20px; padding: 10px; border: 1px solid #ddd; border-radius: 5px; }
+    .current { background-color: #f0f9ff; border-color: #99ccff; }
+    .intervals { margin-top: 10px; }
+    .intervals ul { margin: 5px 0; padding-left: 20px; }
+  `;
+  document.head.appendChild(style);
+  
+  // Initialize the stopwatch
+  const stopwatch = new Stopwatch(displayEl, resultsEl);
+  
+  // Add event listeners
+  startBtn.addEventListener('click', () => stopwatch.start());
+  stopBtn.addEventListener('click', () => stopwatch.stop());
+  completeBtn.addEventListener('click', () => stopwatch.completeSession());
+  
+  function createButton(text, id) {
+    const button = document.createElement('button');
+    button.id = id;
+    button.innerText = text;
+    button.style.padding = '8px 16px';
+    button.style.margin = '0 5px';
+    button.style.cursor = 'pointer';
+    return button;
+  }
+});
